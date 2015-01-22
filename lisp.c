@@ -19,7 +19,7 @@ _ptr stack;   // Local definitions
 
 jmp_buf j_b;
 
-#define N 1000
+#define N 10000
 cell *memory;
 _ptr mem;
 _ptr free_mem = 0;
@@ -311,6 +311,10 @@ _ptr null(_ptr x)
 
 __inline__ _ptr car(_ptr x)
 {
+  if (atomp(x)) {
+    error("CAR of a ATOM");
+    longjmp(j_b, 1);
+  }
   return A(x);
 }
 
@@ -394,7 +398,7 @@ _ptr pair(_ptr x, _ptr y)
     return nil;
   }
   else if (and(not(atomp(x)), not(atomp(y)))) {
-    return cons(cons(car(x), cons(car(y),nil)), pair(cdr(x), cdr(y)));
+    return cons(cons(car(x), cons(car(y), nil)), pair(cdr(x), cdr(y)));
   }
   else {
     error("Error in PAIR\n");
@@ -416,7 +420,10 @@ _ptr list_eval(_ptr l, _ptr env)
 
 _ptr cond_eval(_ptr c, _ptr env)
 {
-  if (eval(caar(c), env)) {
+  if (null(c)) {
+    return nil;
+  }
+  else if (eval(caar(c), env)) {
     return eval(cadar(c), env);
   }
   else {
@@ -681,7 +688,7 @@ int main(int argc, char * argv[]) {
       init_file = optarg;
       break;
     case 'D':
-      // Debug level 0 - error -> 5 - debug
+      // Debug level 0 - error -> 4 - debug
       debug_lvl = atoi(optarg);
       break;
     default: /* '?' */
@@ -708,9 +715,9 @@ int main(int argc, char * argv[]) {
     debug("read init file");
   }
 
-  setjmp(j_b);
-
-  debug("done setjmp");
+  if (setjmp(j_b) == 0) {
+    debug("done setjmp");
+  };
 
   do {
     printf("> ");

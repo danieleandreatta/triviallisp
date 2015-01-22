@@ -21,7 +21,7 @@ void _emit(int lvl, char *fmt, va_list args) {
   if (lvl > DEBUG) lvl = DEBUG;
   if (lvl < ERROR) lvl = ERROR;
   if (_lvl >= lvl) {
-    printf("%s ", level_name[lvl]); 
+    printf("%s: ", level_name[lvl]); 
     vprintf(fmt, args);
     printf("\n");
   }
