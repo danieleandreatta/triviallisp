@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <setjmp.h>
 #include <unistd.h>
+#include <limits.h>
 
 #include "lisp.h"
 #include "reader.h"
@@ -95,10 +96,9 @@ void gc(_type type, _ptr a, _ptr b)
 
   info("** Performig GC...");
 
-  //  dump_mem();
   // Mark phase
   if (type == CONS) {
-    // These are the current poiters to the result being calculated
+    // These are the current pointers to the result being calculated
     gc_mark(a);
     gc_mark(b);
   }
@@ -181,32 +181,14 @@ void mem_init(int mem_size, int sym_size, int sym_len)
   free_mem = N-2;
 }
 
-_ptr alloc_cell_(_type type, _ptr a, _ptr b, int try_gc) {
-  // type, a, b are the current intermediate results
-  // for the expression being evaluated.
-  // we need to know them here so we do not GC them
-
-  _ptr x;
-  //  printf("Free mem: %d\n", free_mem);
+_ptr alloc_cell(void) {
+  _ptr x = PTR_MAX;
   if (mem != nil) {
     x = mem;
     --free_mem;
     mem = B(mem);
   }
-  else {
-    if (try_gc) {
-      gc(type, a, b);
-      x = alloc_cell_(type, a, b, 0);
-    } else {
-      error("Out of memory. Aborting!");
-      exit(EXIT_FAILURE);
-    }
-  }
   return x;
-}
-
-_ptr alloc_cell(_type type, _ptr a, _ptr b) {
-  return alloc_cell_(type, a, b, 1);
 }
 
 _ptr str(char *name)
@@ -243,7 +225,18 @@ _ptr new_cell(_type type, _type subt, _ptr a, _ptr b)
 {
   _ptr x;
 
-  x = alloc_cell(type, a, b);
+  x = alloc_cell();
+  if (x == PTR_MAX) {
+    // alloc_cell failed, run gc
+    gc(type, a, b);
+    x = alloc_cell();
+  }
+  if (x == PTR_MAX) {
+    // out of memory.
+    error("Out of memory. Aborting!");
+    exit(EXIT_FAILURE);
+  }
+
   TYPE(x) = type;
   SUBT(x) = subt;
   A(x)    = a;
@@ -277,26 +270,26 @@ void init(int mem_size, int sym_size, int sym_len)
   global = nil;
   curr = nil;
 
-  y   = sym("car");
+  y = sym("car");
   def_add(y, y);
 
-  y   = sym("cdr");
+  y = sym("cdr");
   def_add(y, y);
 
-  y   = sym("cond");
+  y = sym("cond");
   def_add(y, y);
 
-  y   = sym("cons");
+  y = sym("cons");
   def_add(y, y);
 
-  y   = sym("atomp");
+  y = sym("atomp");
   def_add(y, y);
 
-  y   = sym("lambda");
-  def_add(y,y);
+  y = sym("lambda");
+  def_add(y, y);
   
-  y   = sym("defun");
-  def_add(y,y);
+  y = sym("defun");
+  def_add(y, y);
 }
 
 _ptr null(_ptr x)
@@ -671,6 +664,17 @@ int eval_from_file(FILE *fin) {
   }
 }
 
+void usage_short(char *prog) {
+  fprintf(stderr, "Usage: %s [-h] [-i file] [-D debug_lvl]\n", prog);
+}
+
+void usage_long(char *prog) {
+  usage_short(prog);
+  fprintf(stderr, "\n  -i file : use initialization file\n");
+  fprintf(stderr, "  -D dbg  : debug level (0 error -> 4 debug)\n");
+  fprintf(stderr, "  -h      : this help\n");
+}
+
 int main(int argc, char * argv[]) {
   _ptr x;
   char *init_file = NULL;
@@ -681,7 +685,7 @@ int main(int argc, char * argv[]) {
   int sym_len = SYM_LEN;
   int debug_lvl = INFO;
 
-  while ((opt = getopt(argc, argv, "i:D:")) != -1) {
+  while ((opt = getopt(argc, argv, "hi:D:")) != -1) {
     switch (opt) {
     case 'i':
       // Initialization file
@@ -691,8 +695,12 @@ int main(int argc, char * argv[]) {
       // Debug level 0 - error -> 4 - debug
       debug_lvl = atoi(optarg);
       break;
+    case 'h':
+      usage_long(argv[0]);
+      exit(EXIT_SUCCESS);
+      break;
     default: /* '?' */
-      fprintf(stderr, "Usage: %s [-i file]\n", argv[0]);
+      usage_short(argv[0]);
       exit(EXIT_FAILURE);
     }
   }

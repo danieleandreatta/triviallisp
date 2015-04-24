@@ -3,6 +3,8 @@
 typedef unsigned short int _type;
 typedef unsigned int _ptr;
 
+#define PTR_MAX UINT_MAX
+
 typedef struct cell {
   _type type;
   _type subt;
