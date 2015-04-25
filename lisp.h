@@ -15,7 +15,7 @@ typedef struct cell {
 _ptr null(_ptr);
 void print_symbol(_ptr);
 _ptr str(char *);
-_ptr sym(char *);
+_ptr sym(const char *);
 _ptr num(int);
 _ptr new_cell(_type, _type, _ptr, _ptr);
 _ptr atom(_ptr, _ptr, _type);

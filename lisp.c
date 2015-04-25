@@ -18,6 +18,22 @@ _ptr global;  // Symbol global definitions
 _ptr curr;    // Current Expression
 _ptr stack;   // Local definitions
 
+_ptr sym_car;
+_ptr sym_cdr;
+_ptr sym_cons;
+_ptr sym_cond;
+_ptr sym_atomp;
+_ptr sym_lambda;
+_ptr sym_defun;
+_ptr sym_eq;
+_ptr sym_let;
+_ptr sym_quote;
+_ptr sym_numberp;
+_ptr sym_plus;
+_ptr sym_minus;
+_ptr sym_times;
+_ptr sym_div;
+
 jmp_buf j_b;
 
 #define N 10000
@@ -38,7 +54,14 @@ void def_add(_ptr x, _ptr y)
   global = cons(cons(x, cons(y, nil)), global );
 }
 
-_ptr sym_(char *x)
+_ptr def_sym(const char *s)
+{
+  _ptr x = sym(s);
+  def_add(x, x);
+  return x;
+}
+
+_ptr sym_(const char *x)
 {
   int i, k=-1;
   for (i=0; i<tbl_pos; ++i){
@@ -63,7 +86,7 @@ _ptr sym_(char *x)
   return (_ptr)k;
 }
 
-__inline__ _ptr sym(char *s)
+__inline__ _ptr sym(const char *s)
 {
   return atom(sym_(s), nil, SYMBOL);
 }
@@ -262,34 +285,27 @@ void dump_mem()
  
 void init(int mem_size, int sym_size, int sym_len)
 {
-  _ptr y;
-
   mem_init(mem_size, sym_size, sym_len); // Defines nil and t also.
 
   stack = nil;
   global = nil;
   curr = nil;
 
-  y = sym("car");
-  def_add(y, y);
-
-  y = sym("cdr");
-  def_add(y, y);
-
-  y = sym("cond");
-  def_add(y, y);
-
-  y = sym("cons");
-  def_add(y, y);
-
-  y = sym("atomp");
-  def_add(y, y);
-
-  y = sym("lambda");
-  def_add(y, y);
-  
-  y = sym("defun");
-  def_add(y, y);
+  sym_car = def_sym("car");
+  sym_cdr = def_sym("cdr");
+  sym_cond = def_sym("cond");
+  sym_cons = def_sym("cons");
+  sym_atomp = def_sym("atomp");
+  sym_lambda = def_sym("lambda");
+  sym_defun = def_sym("defun");
+  sym_quote = def_sym("quote");
+  sym_numberp = def_sym("numberp");
+  sym_let = def_sym("let");
+  sym_eq = def_sym("eq");
+  sym_plus = def_sym("+");
+  sym_minus = def_sym("-");
+  sym_times = def_sym("*");
+  sym_div = def_sym("/");
 }
 
 _ptr null(_ptr x)
@@ -455,43 +471,43 @@ _ptr eval(_ptr e, _ptr env)
   }
   else if (atomp(car(e))) {
     // Function. see if it is an internal one first
-    if (eq(car(e), sym("quote"))) {
+    if (eq(car(e), sym_quote)) {
       r = cadr(e);
     }
-    else if (eq(car(e), sym("numberp"))) {
+    else if (eq(car(e), sym_numberp)) {
       r = numberp(eval(cadr(e), env));
     }
-    else if (eq(car(e), sym("atomp"))) {
+    else if (eq(car(e), sym_atomp)) {
       r = atomp(eval(cadr(e), env));
     }
-    else if (eq(car(e), sym("eq"))) {
+    else if (eq(car(e), sym_eq)) {
       push(eval(cadr(e), env));
       push(eval(caddr(e), env));
       r = eq(pop(), pop());
     }
-    else if (eq(car(e), sym("car"))) {
+    else if (eq(car(e), sym_car)) {
       r = car(eval(cadr(e), env));
     }
-    else if (eq(car(e), sym("cdr"))) {
+    else if (eq(car(e), sym_cdr)) {
       r = cdr(eval(cadr(e), env));
     }
-    else if (eq(car(e), sym("cons"))) {
+    else if (eq(car(e), sym_cons)) {
       push(eval(cadr(e), env));
       push(eval(caddr(e), env));
       r = cons(pop(), pop());
     }
-    else if (eq(car(e), sym("cond"))) {
+    else if (eq(car(e), sym_cond)) {
       r = cond_eval(cdr(e), env);
     }
-    else if (eq(car(e), sym("defun"))) {
-      push(cons(sym("lambda"), cdr(cdr(e))));
+    else if (eq(car(e), sym_defun)) {
+      push(cons(sym_lambda, cdr(cdr(e))));
       def_add(cadr(e), pop()); 
       r = nil;
     }
-    else if (eq(car(e), sym("lambda"))) {
+    else if (eq(car(e), sym_lambda)) {
       r = e;
     }
-    else if (eq(car(e), sym("let"))) {
+    else if (eq(car(e), sym_let)) {
       push(eval(cadr(cadr(e)), env));
       push(append(cons(cons(caadr(e),cons(pop(), nil)), nil), env));
       r = eval(caddr(e), pop());
@@ -528,7 +544,7 @@ _ptr eval(_ptr e, _ptr env)
     else if (eq(car(e), sym("bye"))) {
       r = car(e);
     } 
-    else if (eq(car(e), sym("+"))) {
+    else if (eq(car(e), sym_plus)) {
       _ptr a, b;
       a = eval(cadr(e), env);
       b = eval(caddr(e), env);
@@ -539,7 +555,7 @@ _ptr eval(_ptr e, _ptr env)
         error("'+ is not defined for non-numbers");
       }
     }
-    else if (eq(car(e), sym("-"))) {
+    else if (eq(car(e), sym_minus)) {
       _ptr a, b;
       a = eval(cadr(e), env);
       b = eval(caddr(e), env);
@@ -550,7 +566,7 @@ _ptr eval(_ptr e, _ptr env)
         error("'- is not defined for non-numbers");
       }
     }
-    else if (eq(car(e), sym("*"))) {
+    else if (eq(car(e), sym_times)) {
       _ptr a, b;
       a = eval(cadr(e), env);
       b = eval(caddr(e), env);
@@ -561,7 +577,7 @@ _ptr eval(_ptr e, _ptr env)
         error("'* is not defined for non-numbers");
       }
     }
-    else if (eq(car(e), sym("/"))) {
+    else if (eq(car(e), sym_div)) {
       _ptr a, b;
       a = eval(cadr(e), env);
       b = eval(caddr(e), env);
@@ -588,15 +604,7 @@ _ptr eval(_ptr e, _ptr env)
       }
     }
   }
-  else if (eq(caar(e), sym("label"))) {
-    // Label.
-    r = eval(
-          cons(caddar(e),
-               cdr(e)), 
-          cons(cons(cadar(e), 
-               cons(car(e), nil)), env));
-  }
-  else if (eq(caar(e), sym("lambda"))) {
+  else if (eq(caar(e), sym_lambda)) {
     // Evaluating a lambda function
     // e.g. ((lambda (x) (x)) 'a)
     push(list_eval(cdr(e), env));
